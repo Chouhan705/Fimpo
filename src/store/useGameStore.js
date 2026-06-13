@@ -10,8 +10,8 @@ export const GAME_PHASES = {
   VERBAL_ROUND: 'VERBAL_ROUND',
   VOTING: 'VOTING',
   SHOWDOWN: 'SHOWDOWN',
-  RESOLUTION: 'RESOLUTION',
-  REDEMPTION: 'REDEMPTION'
+  REDEMPTION: 'REDEMPTION',
+  RESOLUTION: 'RESOLUTION'
 };
 
 const useGameStore = create((set, get) => ({
@@ -126,6 +126,8 @@ const useGameStore = create((set, get) => ({
   })),
 
   // Increments digital tally indicators or moves to final round parsing
+  // Optimized: Pass the updated player list directly to avoid async state delay bugs
+  // Updated: Always routes to public results first to keep data secure
   castSecretVote: (suspectId) => {
     const { players, activeVoteIndex } = get();
     const totalPlayers = players.length;
@@ -141,14 +143,33 @@ const useGameStore = create((set, get) => ({
     }
   },
 
-  // Tallies results, evaluates ties, and distributes scores dynamically
+  // Helper calculation to let the results screen check the verdict safely
+  getVotingVerdict: () => {
+    const { players } = get();
+    const maxVotes = Math.max(...players.map(p => p.votesReceived));
+    const highestVotedPlayers = players.filter(p => p.votesReceived === maxVotes);
+
+    if (highestVotedPlayers.length > 1 && maxVotes > 0) {
+      return { status: 'TIE', defendants: highestVotedPlayers };
+    }
+    return { status: 'DECIDED', victim: highestVotedPlayers[0] };
+  },
+
+  // New Action: Automatically handles score distribution if a Civilian was executed
+  applyCivilianEliminationPoints: () => {
+    const { players } = get();
+    const updatedPlayers = players.map(player => {
+      if (player.isImposter) return { ...player, score: player.score + 1 }; // Imposter wins!
+      return player;
+    });
+    set({ players: updatedPlayers });
+  },
   resolveVotingResults: () => {
     const { players } = get();
     
     const maxVotes = Math.max(...players.map(p => p.votesReceived));
     const highestVotedPlayers = players.filter(p => p.votesReceived === maxVotes);
 
-    // If there is a tie, route to the SHOWDOWN state
     if (highestVotedPlayers.length > 1 && maxVotes > 0) {
       set({ currentPhase: GAME_PHASES.SHOWDOWN });
       return { status: 'TIE', defendants: highestVotedPlayers };
@@ -156,38 +177,50 @@ const useGameStore = create((set, get) => ({
 
     const victim = highestVotedPlayers[0];
     
-    const updatedPlayers = players.map(player => {
-      // Civilians score points if they successfully execute the Imposter
-      if (victim?.isImposter && !player.isImposter) {
-        return { ...player, score: player.score + 1 };
-      }
-      // The Imposter scores if the group executes a Civilian instead
-      if (!victim?.isImposter && player.isImposter) {
-        return { ...player, score: player.score + 1 };
-      }
-      return player;
-    });
-
-    set({ players: updatedPlayers });
-    return { status: 'DECIDED', victim };
+    if (victim?.isImposter) {
+      // Imposter caught! Route directly to Redemption round (points are deferred until they guess)
+      set({ currentPhase: GAME_PHASES.REDEMPTION });
+      return { status: 'REDEMPTION', victim };
+    } else {
+      // RULE 3: Imposter NOT caught! Only the Imposter gets a point
+      const updatedPlayers = players.map(player => {
+        if (player.isImposter) {
+          return { ...player, score: player.score + 1 };
+        }
+        return player;
+      });
+      set({ players: updatedPlayers, currentPhase: GAME_PHASES.RESOLUTION });
+      return { status: 'DECIDED', victim };
+    }
   },
+
+  // Handles point distribution based on the Imposter's verbal guess
   resolveRedemption: (imposterGuessedCorrectly) => {
     const { players } = get();
 
     const updatedPlayers = players.map(player => {
       if (imposterGuessedCorrectly) {
-        // Imposter guessed the word right! They steal the win (+1 pt)
-        if (player.isImposter) return { ...player, score: player.score + 1 };
+        // RULE 1: Imposter guessed correctly! EVERYONE gets 1 point
+        return { ...player, score: player.score + 1 };
       } else {
-        // Imposter guessed wrong! All Civilians get (+1 pt)
+        // RULE 2: Imposter guessed wrong! Only Civilians get 1 point
         if (!player.isImposter) return { ...player, score: player.score + 1 };
       }
       return player;
     });
 
-    set({ 
-      players: updatedPlayers, 
-      currentPhase: GAME_PHASES.RESOLUTION // Redirect to show final points and vote break
+    set({ players: updatedPlayers });
+    
+    // Clear the current match variables and return straight to the live Lobby Hub
+    set({
+      currentPhase: GAME_PHASES.LOBBY_HUB,
+      secretWord: '',
+      imposterWord: '',
+      category: '',
+      startingPlayerId: null,
+      activeRevealIndex: 0,
+      activeVoteIndex: 0,
+      fetchedImages: []
     });
   },
 

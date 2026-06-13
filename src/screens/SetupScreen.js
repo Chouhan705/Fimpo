@@ -106,13 +106,13 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   title: {
-    fontSize: 32,
+    fontSize: 38,
     letterSpacing: 2,
     color: '#FF6B6B',
     textTransform: 'uppercase',
   },
   subtitle: {
-    fontSize: 14,
+    fontSize: 20,
     color: '#777',
     marginTop: 4,
   },
@@ -127,7 +127,7 @@ const styles = StyleSheet.create({
     borderColor: '#262626',
   },
   counterLabel: {
-    fontSize: 14,
+    fontSize: 20,
     color: '#A0A0A0',
     letterSpacing: 1,
     textTransform: 'uppercase',
@@ -175,13 +175,13 @@ const styles = StyleSheet.create({
     marginRight: 15,
   },
   avatar: {
-    width: 45,
-    height: 45,
+    width: 60,
+    height: 60,
   },
   input: {
     flex: 1,
     fontFamily: 'CustomFont-Main', // Ensures player text matches your brand
-    fontSize: 16,
+    fontSize: 20,
     color: '#FFFFFF',
     paddingVertical: 8,
   },
@@ -194,7 +194,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   launchButtonText: {
-    fontSize: 16,
+    fontSize: 20,
     letterSpacing: 2,
   },
 });

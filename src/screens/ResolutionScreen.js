@@ -1,16 +1,18 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { StyleSheet, View, Image, TouchableOpacity, ScrollView } from 'react-native';
-import useGameStore from '../store/useGameStore';
+import useGameStore, { GAME_PHASES } from '../store/useGameStore';
 import FimpoText from '../components/FimpoText';
 
 export default function ResolutionScreen() {
-  const { players, resolveVotingResults, returnToLobbyHub } = useGameStore();
-  const [matchSummary, setMatchSummary] = useState(null);
+  const { players, getVotingVerdict, applyCivilianEliminationPoints, setPhase, returnToLobbyHub } = useGameStore();
 
-  // Run the state point-tally calculations once when the screen mounts onto the layout viewport
+  const verdict = getVotingVerdict();
+
+  // If a Civilian was eliminated, apply the Imposter's bonus points immediately on mount
   useEffect(() => {
-    const results = resolveVotingResults();
-    setMatchSummary(results);
+    if (verdict.status === 'DECIDED' && !verdict.victim?.isImposter) {
+      applyCivilianEliminationPoints();
+    }
   }, []);
 
   return (
@@ -22,7 +24,7 @@ export default function ResolutionScreen() {
 
       {/* Center Execution Card Reveal Block */}
       <View style={styles.centerRevealCard}>
-        {matchSummary?.status === 'TIE' ? (
+        {verdict.status === 'TIE' ? (
           <View style={styles.outcomeGroup}>
             <FimpoText style={styles.outcomeTitle}>STALEMATE! ⚖️</FimpoText>
             <FimpoText style={styles.outcomeDesc}>
@@ -32,16 +34,15 @@ export default function ResolutionScreen() {
         ) : (
           <View style={styles.outcomeGroup}>
             <FimpoText style={styles.victimLabel}>MOST ACCUSED PLAYER:</FimpoText>
-            <Image source={{ uri: matchSummary?.victim?.avatar }} style={styles.victimAvatar} />
-            <FimpoText style={styles.victimName}>{matchSummary?.victim?.name}</FimpoText>
+            <FimpoText style={styles.victimName}>{verdict.victim?.name}</FimpoText>
             
-            {matchSummary?.victim?.isImposter ? (
+            {verdict.victim?.isImposter ? (
               <View style={styles.winBadgeCivilian}>
-                <FimpoText style={styles.winBadgeText}>IMPOSTER CAUGHT! CIVILIANS WIN 🎉</FimpoText>
+                <FimpoText style={styles.winBadgeText}>🎯 TARGET IS THE IMPOSTER!</FimpoText>
               </View>
             ) : (
               <View style={styles.winBadgeImposter}>
-                <FimpoText style={styles.winBadgeText}>ELIMINATED A CIVILIAN! IMPOSTER WINS 🦊</FimpoText>
+                <FimpoText style={styles.winBadgeText}>💀 ELIMINATED AN INNOCENT CIVILIAN!</FimpoText>
               </View>
             )}
           </View>
@@ -65,14 +66,26 @@ export default function ResolutionScreen() {
         </ScrollView>
       </View>
 
-      {/* Return Action Hook Container Button back into persistent game hub */}
-      <TouchableOpacity 
-        style={styles.lobbyReturnBtn} 
-        activeOpacity={0.8}
-        onPress={returnToLobbyHub}
-      >
-        <FimpoText style={styles.lobbyReturnBtnText}>RETURN TO LOBBY HUB ➔</FimpoText>
-      </TouchableOpacity>
+      {/* Dynamic Action Buttons depending on the verdict status */}
+      <View style={styles.footerZone}>
+        {verdict.status === 'TIE' && (
+          <TouchableOpacity style={styles.actionBtn} onPress={() => setPhase(GAME_PHASES.SHOWDOWN)}>
+            <FimpoText style={styles.actionBtnText}>GO TO SHOWDOWN DEBATE ➔</FimpoText>
+          </TouchableOpacity>
+        )}
+
+        {verdict.status === 'DECIDED' && verdict.victim?.isImposter && (
+          <TouchableOpacity style={[styles.actionBtn, styles.redemptionColor]} onPress={() => setPhase(GAME_PHASES.REDEMPTION)}>
+            <FimpoText style={styles.actionBtnText}>🦊 TRIGGER IMPOSTER REDEMPTION ➔</FimpoText>
+          </TouchableOpacity>
+        )}
+
+        {verdict.status === 'DECIDED' && !verdict.victim?.isImposter && (
+          <TouchableOpacity style={styles.actionBtn} onPress={returnToLobbyHub}>
+            <FimpoText style={styles.actionBtnText}>RETURN TO LOBBY HUB ➔</FimpoText>
+          </TouchableOpacity>
+        )}
+      </View>
     </View>
   );
 }
@@ -89,8 +102,7 @@ const styles = StyleSheet.create({
   outcomeDesc: { fontSize: 13, color: '#A0A0A0', textAlign: 'center', lineHeight: 20 },
   
   victimLabel: { fontSize: 11, color: '#666', letterSpacing: 2 },
-  victimAvatar: { width: 110, height: 110, backgroundColor: '#262626', borderRadius: 55, marginVertical: 15 },
-  victimName: { fontSize: 26, color: '#FFF', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 15 },
+  victimName: { fontSize: 28, color: '#FF6B6B', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 15 },
   
   winBadgeCivilian: { backgroundColor: 'rgba(46, 204, 113, 0.15)', borderWidth: 1, borderColor: '#2ECC71', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12 },
   winBadgeImposter: { backgroundColor: 'rgba(231, 76, 60, 0.15)', borderWidth: 1, borderColor: '#E74C3C', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12 },
@@ -106,6 +118,8 @@ const styles = StyleSheet.create({
   foxIndicatorText: { marginLeft: 6, fontSize: 12 },
   voteCountBadge: { fontSize: 13, color: '#FF6B6B', fontWeight: 'bold' },
 
-  lobbyReturnBtn: { backgroundColor: '#FF6B6B', paddingVertical: 18, borderRadius: 16, alignItems: 'center', shadowColor: '#FF6B6B', shadowRadius: 10, shadowOpacity: 0.3, elevation: 5 },
-  lobbyReturnBtnText: { fontSize: 16, letterSpacing: 1 }
+  footerZone: { width: '100%' },
+  actionBtn: { backgroundColor: '#262626', borderWidth: 1, borderColor: '#333', paddingVertical: 18, borderRadius: 16, alignItems: 'center', shadowColor: '#000', shadowRadius: 6, shadowOpacity: 0.2, elevation: 3 },
+  redemptionColor: { backgroundColor: '#FF6B6B', borderColor: '#FF6B6B' },
+  actionBtnText: { fontSize: 15, color: '#FFF', letterSpacing: 1 }
 });
