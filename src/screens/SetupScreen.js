@@ -6,7 +6,7 @@ import FimpoText from '../components/FimpoText';
 const { width } = Dimensions.get('window');
 
 export default function SetupScreen() {
-  const { players, addPlayer, removePlayer, updatePlayerName, imposterMode, toggleImposterMode, initializeMatch } = useGameStore();
+  const { players, addPlayer, removePlayer, updatePlayerName,imposterMode,toggleImposterMode,setInitialPlayersList } = useGameStore();
 
   return (
     <KeyboardAvoidingView 
@@ -74,10 +74,17 @@ export default function SetupScreen() {
         <TouchableOpacity 
           style={styles.launchButton}
           activeOpacity={0.8}
-          onPress={() => initializeMatch()} // Moves to the pass-and-play reveal phase next
-        >
-          <FimpoText style={styles.launchButtonText}>CONTINUE TO ROLES</FimpoText>
-        </TouchableOpacity>
+          onPress={() => {
+            // Basic verification guard to make sure nobody left names totally blank
+            const preparedPlayers = players.map(p => ({
+              ...p,
+              name: p.name.trim() || `Player ${p.id}`
+            }));
+          setInitialPlayersList(preparedPlayers); // Locks players into their session slots
+          }}
+          >
+      <FimpoText style={styles.launchButtonText}>CREATE GAME SESSION ➔</FimpoText>
+      </TouchableOpacity>
 
       </ScrollView>
     </KeyboardAvoidingView>

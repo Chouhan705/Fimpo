@@ -1,8 +1,7 @@
 import React, { useEffect, useCallback } from 'react';
-import { StyleSheet, SafeAreaView, StatusBar, View } from 'react-native';
+import { StyleSheet, SafeAreaView, StatusBar, Alert, BackHandler } from 'react-native';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
-
 
 import useGameStore, { GAME_PHASES } from './src/store/useGameStore';
 import HomeScreen from './src/screens/HomeScreen';
@@ -12,30 +11,53 @@ import RevealScreen from './src/screens/RevealScreen.js';
 import WheelScreen from './src/screens/WheelScreen';
 import VerbalRoundScreen from './src/screens/VerbalRoundScreen';
 import VotingScreen from './src/screens/VotingScreen';
-import ResolutionPlaceholder from './src/screens/ResolutionPlaceholder';
+import ResolutionScreen from './src/screens/ResolutionScreen';
+import RedemptionScreen from './src/screens/RedemptionScreen';
+import ShowdownScreen from './src/screens/ShowdownScreen';
 
-// Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
 
 export default function App() {
   const currentPhase = useGameStore((state) => state.currentPhase);
+  const resetGame = useGameStore((state) => state.resetGame);
 
-  // Load your custom fonts here
   const [fontsLoaded, fontError] = useFonts({
-    // Give it an identifier name you will use in your stylesheets
     'CustomFont-Main': require('./assets/fonts/YourCustomFont.ttf'), 
-    // Example: 'Sansation-Bold': require('./assets/fonts/Sansation-Bold.ttf'),
   });
-  
 
-  // Hide the splash screen once fonts are loaded or if an error occurs
+  const triggerExitConfirmation = useCallback(() => {
+    Alert.alert(
+      "Exit Game Session?",
+      "Are you sure you want to end this game session? Current score records will be lost.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Exit Session", style: "destructive", onPress: () => resetGame() }
+      ]
+    );
+    return true; 
+  }, [resetGame]);
+
+  useEffect(() => {
+    const onBackPress = () => {
+      if (currentPhase === GAME_PHASES.SETUP || currentPhase === GAME_PHASES.PLAYER_SETUP) {
+        return false; 
+      }
+      return triggerExitConfirmation();
+    };
+
+    // Modern BackHandler Subscription
+    const backHandlerSubscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    
+    // Clean up using the subscription object directly
+    return () => backHandlerSubscription.remove();
+  }, [currentPhase, triggerExitConfirmation]);
+
   const onLayoutRootView = useCallback(async () => {
     if (fontsLoaded || fontError) {
       await SplashScreen.hideAsync();
     }
   }, [fontsLoaded, fontError]);
 
-  // Guard clause: Render nothing while assets are preparing
   if (!fontsLoaded && !fontError) {
     return null;
   }
@@ -46,12 +68,14 @@ export default function App() {
       
       {currentPhase === GAME_PHASES.SETUP && <HomeScreen />}
       {currentPhase === GAME_PHASES.PLAYER_SETUP && <SetupScreen />}
-      
+      {currentPhase === GAME_PHASES.LOBBY_HUB && <LobbyHubScreen />}
       {currentPhase === GAME_PHASES.WHEEL_OF_FATE && <WheelScreen />}
       {currentPhase === GAME_PHASES.ROLE_REVEAL && <RevealScreen />}
       {currentPhase === GAME_PHASES.VERBAL_ROUND && <VerbalRoundScreen />}
       {currentPhase === GAME_PHASES.VOTING && <VotingScreen />}
-      {currentPhase === GAME_PHASES.RESOLUTION && <ResolutionPlaceholder />}
+      {currentPhase === GAME_PHASES.SHOWDOWN && <ShowdownScreen />}
+      {currentPhase === GAME_PHASES.REDEMPTION && <RedemptionScreen />}
+      {currentPhase === GAME_PHASES.RESOLUTION && <ResolutionScreen />}
     </SafeAreaView>
   );
 }
