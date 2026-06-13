@@ -4,6 +4,7 @@ import { WORD_BANK, fetchWordImages } from '../services/gameEngine';
 export const GAME_PHASES = {
   SETUP: 'SETUP',
   PLAYER_SETUP: 'PLAYER_SETUP',
+  LOBBY_HUB: 'LOBBY_HUB',
   WHEEL_OF_FATE: 'WHEEL_OF_FATE',
   ROLE_REVEAL: 'ROLE_REVEAL',
   VERBAL_ROUND: 'VERBAL_ROUND',
@@ -99,6 +100,37 @@ const useGameStore = create((set, get) => ({
       set({ currentPhase: GAME_PHASES.VERBAL_ROUND }); // All roles verified -> Moving into verbal arguments
     } else {
       set({ activeRevealIndex: activeRevealIndex + 1 });
+    }
+  },
+  startVotingPhase: () => set((state) => ({
+    currentPhase: GAME_PHASES.VOTING,
+    activeVoteIndex: 0,
+    players: state.players.map(p => ({ ...p, votesReceived: 0 }))
+  })),
+
+  // Registers a secret vote cast against a target suspect player
+  castSecretVote: (suspectId) => {
+    const { players, activeVoteIndex, startIndex, startingPlayerId } = get();
+    const totalPlayers = players.length;
+    
+    // Register the vote safely on the suspect object
+    const updatedPlayers = players.map(p => 
+      p.id === suspectId ? { ...p, votesReceived: p.votesReceived + 1 } : p
+    );
+
+    if (activeVoteIndex + 1 >= totalPlayers) {
+      // All players have voted! Let's tally results next.
+      // We will route to a placeholder or next stage resolution logic
+      set({ 
+        players: updatedPlayers, 
+        currentPhase: GAME_PHASES.RESOLUTION // Tallying/Result phase handles next
+      });
+    } else {
+      // Advance to the next person in line to vote
+      set({ 
+        players: updatedPlayers,
+        activeVoteIndex: activeVoteIndex + 1 
+      });
     }
   }
 }));
