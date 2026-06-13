@@ -1,29 +1,22 @@
-// Local thematic Word Bank
-export const WORD_BANK = {
-  ANIMALS: [
-    { civilian: 'Lion', infiltrator: 'Tiger' },
-    { civilian: 'Dolphin', infiltrator: 'Whale' },
-    { civilian: 'Eagle', infiltrator: 'Hawk' },
-    { civilian: 'Alligator', infiltrator: 'Crocodile' }
-  ],
-  FOOD: [
-    { civilian: 'Apple', infiltrator: 'Pear' },
-    { civilian: 'Pizza', infiltrator: 'Burger' },
-    { civilian: 'Coffee', infiltrator: 'Tea' },
-    { civilian: 'Ice Cream', infiltrator: 'Yogurt' }
-  ],
-  PLACES: [
-    { civilian: 'Castle', infiltrator: 'Palace' },
-    { civilian: 'Desert', infiltrator: 'Beach' },
-    { civilian: 'Hospital', infiltrator: 'Clinic' },
-    { civilian: 'School', infiltrator: 'College' }
-  ]
+import { EXTENDED_WORD_BANK } from './wordBankData';
+
+// Fallback Category Emojis mapping structure
+const CATEGORY_EMOJIS = {
+  "Around the House": '🏠',
+  "Global Landmarks & Travel": '✈️',
+  "Food & Drinks": '🍔',
+  "Occupations & Professions": '💼',
+  "Animals & Nature": '🦁',
+  "Entertainment & Pop Culture": '🎬',
+  "Sports & Hobbies": '⚽',
+  "Clothing & Fashion": '🕶️',
+  "Technology & Modern Life": '🤖',
+  "History, Myth & Fantasy": '🐉'
 };
 
-// Sequential image extraction engine: Wikimedia -> Local Fallback Emoji
 export async function fetchWordImages(word, category) {
   try {
-    // 1. Primary Fetch: Wikimedia API (No keys required, reliable open source public source)
+    // Primary Pipeline: Query open source Wikimedia API asset engine
     const url = `https://en.wikipedia.org/w/api.php?action=query&format=json&prop=pageimages|images&titles=${encodeURIComponent(word)}&pithumbsize=400&origin=*`;
     const response = await fetch(url);
     const data = await response.json();
@@ -33,19 +26,17 @@ export async function fetchWordImages(word, category) {
       const pageId = Object.keys(pages)[0];
       const thumbnail = pages[pageId]?.thumbnail?.source;
       if (thumbnail) {
-        // Return duplicate URLs or single URL array for our carousel layout mapping
         return [thumbnail, thumbnail, thumbnail];
       }
     }
   } catch (error) {
-    console.log("Image API pipeline failed, dropping back to category icons:", error);
+    console.log("Image pipeline fallback initiated:", error);
   }
 
-  // 2. Absolute Fallback: Category Emoji Systems if network drops/timeouts clear out
-  const categoryEmojis = { ANIMALS: '🦁', FOOD: '🍕', PLACES: '🏰' };
+  // Final Absolute Offline Fallback
   return {
     isFallback: true,
-    emoji: categoryEmojis[category] || '📦',
+    emoji: CATEGORY_EMOJIS[category] || '📦',
     categoryName: category
   };
 }
