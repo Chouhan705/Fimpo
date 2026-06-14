@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { WORD_BANK, fetchWordImages } from '../services/gameEngine';
+import { EXTENDED_WORD_BANK } from '../services/wordBankData';
+import { fetchWordImages } from '../services/gameEngine';
 
 export const GAME_PHASES = {
   SETUP: 'SETUP',
@@ -19,70 +20,68 @@ const useGameStore = create((set, get) => ({
   // --- Core Game State Slices ---
   // ==========================================
   currentPhase: GAME_PHASES.SETUP,
-  players: [], // Array of: { id, name, avatar, score, isImposter, role, word, votesReceived }
-  imposterMode: 'BLIND', // Options: 'BLIND' or 'INFILTRATOR'
+  players: [], 
+  imposterMode: 'BLIND', 
   secretWord: '',
   imposterWord: '',
   category: '',
   startingPlayerId: null,
-  activeRevealIndex: 0, // Sequential step counter for Pass & Play reveals
-  activeVoteIndex: 0,   // Sequential step counter for casting secret ballots
-  fetchedImages: [],    // Stores fetched image URLs or local category emoji data fallback
+  activeRevealIndex: 0, 
+  activeVoteIndex: 0,   
+  fetchedImages: [],    
 
   // ==========================================
   // --- Game State Actions ---
   // ==========================================
   setPhase: (phase) => set({ currentPhase: phase }),
 
-  // Updates a player's name and live-regenerates their Robohash seed avatar
   updatePlayerName: (id, name) => set((state) => ({
     players: state.players.map((p) => 
       p.id === id ? { ...p, name, avatar: `https://robohash.org/${encodeURIComponent(name || id)}?set=set2` } : p
     )
   })),
 
-  // Initializes custom setup lobby names into persistent scoreboard track layers
   setInitialPlayersList: (inputPlayers) => set({
     players: inputPlayers.map(p => ({ ...p, score: 0, votesReceived: 0 })),
     currentPhase: GAME_PHASES.LOBBY_HUB
   }),
 
-  // Switches between Hard (Blind) and Tactical (Infiltrator) game styles
   toggleImposterMode: () => set((state) => ({
     imposterMode: state.imposterMode === 'BLIND' ? 'INFILTRATOR' : 'BLIND'
   })),
 
-  // Increments input slot counter allocations dynamically during player customization
   addPlayer: () => set((state) => {
     const nextId = (state.players.length + 1).toString();
     const defaultName = `Player ${nextId}`;
     return { players: [...state.players, { id: nextId, name: defaultName, avatar: `https://robohash.org/${defaultName}?set=set2` }] };
   }),
 
-  // Decrements input slot counter allocations safely with strict minimum boundaries
   removePlayer: () => set((state) => {
     if (state.players.length <= 3) return {};
     return { players: state.players.slice(0, -1) };
   }),
 
-  // Core Game Round Randomizer: Sets roles, fetches images, picks the starting reader
   initializeMatch: async () => {
     const { players, imposterMode } = get();
     
-    // 1. Pick a random word pairing category from the local engine database bank
-    const categories = Object.keys(WORD_BANK);
+    const categories = Object.keys(EXTENDED_WORD_BANK);
     const chosenCategory = categories[Math.floor(Math.random() * categories.length)];
-    const wordPairs = WORD_BANK[chosenCategory];
-    const pickedPair = wordPairs[Math.floor(Math.random() * wordPairs.length)];
+    const activeWordList = EXTENDED_WORD_BANK[chosenCategory];
 
-    // 2. Select index layout positions for the hidden Imposter and the starting speaker
+    const civilianWordIndex = Math.floor(Math.random() * activeWordList.length);
+    let infiltratorWordIndex = Math.floor(Math.random() * activeWordList.length);
+    
+    while (infiltratorWordIndex === civilianWordIndex) {
+      infiltratorWordIndex = Math.floor(Math.random() * activeWordList.length);
+    }
+
+    const chosenCivilianWord = activeWordList[civilianWordIndex];
+    const chosenInfiltratorWord = activeWordList[infiltratorWordIndex];
+
     const imposterIndex = Math.floor(Math.random() * players.length);
     const starterIndex = Math.floor(Math.random() * players.length);
+    const images = await fetchWordImages(chosenCivilianWord, chosenCategory);
 
-    // 3. Request image assets asynchronously via the core service pipeline
-    const images = await fetchWordImages(pickedPair.civilian, chosenCategory);
-
-    // 4. Distribute matching role assignments across the global session roster
     const readyPlayers = players.map((player, idx) => {
       const isImposter = idx === imposterIndex;
       return {
@@ -90,8 +89,8 @@ const useGameStore = create((set, get) => ({
         isImposter,
         role: isImposter ? 'IMPOSTER' : 'CIVILIAN',
         word: isImposter 
-          ? (imposterMode === 'BLIND' ? 'Cunning Fox' : pickedPair.infiltrator) 
-          : pickedPair.civilian,
+          ? (imposterMode === 'BLIND' ? 'Cunning Fox' : chosenInfiltratorWord) 
+          : chosenCivilianWord,
         votesReceived: 0
       };
     });
@@ -99,8 +98,8 @@ const useGameStore = create((set, get) => ({
     set({
       players: readyPlayers,
       category: chosenCategory,
-      secretWord: pickedPair.civilian,
-      imposterWord: imposterMode === 'BLIND' ? 'Cunning Fox' : pickedPair.infiltrator,
+      secretWord: chosenCivilianWord,
+      imposterWord: imposterMode === 'BLIND' ? 'Cunning Fox' : chosenInfiltratorWord,
       startingPlayerId: players[starterIndex].id,
       fetchedImages: images,
       activeRevealIndex: 0,
@@ -108,7 +107,6 @@ const useGameStore = create((set, get) => ({
     });
   },
 
-  // Steps through the Pass & Play cycle, transitioning to descriptions when done
   advanceRevealPlayer: () => {
     const { activeRevealIndex, players } = get();
     if (activeRevealIndex + 1 >= players.length) {
@@ -118,18 +116,15 @@ const useGameStore = create((set, get) => ({
     }
   },
 
-  // Resets local round indicators and activates the digital ballot screen layout
   startVotingPhase: () => set((state) => ({
     currentPhase: GAME_PHASES.VOTING,
     activeVoteIndex: 0,
     players: state.players.map(p => ({ ...p, votesReceived: 0 }))
   })),
 
-  // Increments digital tally indicators or moves to final round parsing
-  // Optimized: Pass the updated player list directly to avoid async state delay bugs
-  // Updated: Always routes to public results first to keep data secure
+  // FIXED: Runs voting math directly on the array to avoid async updates jamming the next round!
   castSecretVote: (suspectId) => {
-    const { players, activeVoteIndex } = get();
+    const { players, activeVoteIndex, resolveVotingResults } = get();
     const totalPlayers = players.length;
     
     const updatedPlayers = players.map(p => 
@@ -137,13 +132,15 @@ const useGameStore = create((set, get) => ({
     );
 
     if (activeVoteIndex + 1 >= totalPlayers) {
-      set({ players: updatedPlayers, currentPhase: GAME_PHASES.RESOLUTION });
+      // First update the finalized voting tallies in your local state
+      set({ players: updatedPlayers });
+      // Call the decision logic rule engine directly using our updated array matrix data
+      resolveVotingResults(updatedPlayers);
     } else {
       set({ players: updatedPlayers, activeVoteIndex: activeVoteIndex + 1 });
     }
   },
 
-  // Helper calculation to let the results screen check the verdict safely
   getVotingVerdict: () => {
     const { players } = get();
     const maxVotes = Math.max(...players.map(p => p.votesReceived));
@@ -155,35 +152,36 @@ const useGameStore = create((set, get) => ({
     return { status: 'DECIDED', victim: highestVotedPlayers[0] };
   },
 
-  // New Action: Automatically handles score distribution if a Civilian was executed
   applyCivilianEliminationPoints: () => {
     const { players } = get();
     const updatedPlayers = players.map(player => {
-      if (player.isImposter) return { ...player, score: player.score + 1 }; // Imposter wins!
+      if (player.isImposter) return { ...player, score: player.score + 1 }; 
       return player;
     });
     set({ players: updatedPlayers });
   },
-  resolveVotingResults: () => {
-    const { players } = get();
+
+  // FIXED: Accepts the passing final array cleanly to calculate phase changes instantly
+  resolveVotingResults: (finalPlayersList) => {
+    const activePlayers = finalPlayersList || get().players;
     
-    const maxVotes = Math.max(...players.map(p => p.votesReceived));
-    const highestVotedPlayers = players.filter(p => p.votesReceived === maxVotes);
+    const maxVotes = Math.max(...activePlayers.map(p => p.votesReceived));
+    const highestVotedPlayers = activePlayers.filter(p => p.votesReceived === maxVotes);
 
     if (highestVotedPlayers.length > 1 && maxVotes > 0) {
-      set({ currentPhase: GAME_PHASES.SHOWDOWN });
+      set({ players: activePlayers, currentPhase: GAME_PHASES.SHOWDOWN });
       return { status: 'TIE', defendants: highestVotedPlayers };
     }
 
     const victim = highestVotedPlayers[0];
     
     if (victim?.isImposter) {
-      // Imposter caught! Route directly to Redemption round (points are deferred until they guess)
-      set({ currentPhase: GAME_PHASES.REDEMPTION });
+      // Imposter caught! Route straight to secure Civilian jury panel
+      set({ players: activePlayers, currentPhase: GAME_PHASES.REDEMPTION });
       return { status: 'REDEMPTION', victim };
     } else {
-      // RULE 3: Imposter NOT caught! Only the Imposter gets a point
-      const updatedPlayers = players.map(player => {
+      // Civilian eliminated! Imposter scores points, head to public results review
+      const updatedPlayers = activePlayers.map(player => {
         if (player.isImposter) {
           return { ...player, score: player.score + 1 };
         }
@@ -193,26 +191,21 @@ const useGameStore = create((set, get) => ({
       return { status: 'DECIDED', victim };
     }
   },
-
-  // Handles point distribution based on the Imposter's verbal guess
+  
   resolveRedemption: (imposterGuessedCorrectly) => {
     const { players } = get();
 
     const updatedPlayers = players.map(player => {
       if (imposterGuessedCorrectly) {
-        // RULE 1: Imposter guessed correctly! EVERYONE gets 1 point
         return { ...player, score: player.score + 1 };
       } else {
-        // RULE 2: Imposter guessed wrong! Only Civilians get 1 point
         if (!player.isImposter) return { ...player, score: player.score + 1 };
       }
       return player;
     });
 
-    set({ players: updatedPlayers });
-    
-    // Clear the current match variables and return straight to the live Lobby Hub
-    set({
+    set({ 
+      players: updatedPlayers,
       currentPhase: GAME_PHASES.LOBBY_HUB,
       secretWord: '',
       imposterWord: '',
@@ -224,7 +217,6 @@ const useGameStore = create((set, get) => ({
     });
   },
 
-  // Cleans up local round state variables to return safely to the Lobby Hub
   returnToLobbyHub: () => set({
     currentPhase: GAME_PHASES.LOBBY_HUB,
     secretWord: '',
@@ -235,13 +227,13 @@ const useGameStore = create((set, get) => ({
     activeVoteIndex: 0,
     fetchedImages: []
   }),
+
   triggerShowdownReVote: () => set((state) => ({
     currentPhase: GAME_PHASES.VOTING,
     activeVoteIndex: 0,
     players: state.players.map(p => ({ ...p, votesReceived: 0 }))
   })),
 
-  // Complete hard reset: Wipes everything and resets session back to the Welcome Home screen
   resetGame: () => set({
     currentPhase: GAME_PHASES.SETUP,
     players: [],
