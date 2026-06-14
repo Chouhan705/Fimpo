@@ -9,23 +9,18 @@ export default function RevealScreen() {
   const { 
     players, 
     activeRevealIndex,
-    fetchedImages, 
     advanceRevealPlayer, 
-    startingPlayerId 
+    startingPlayerId,
+    imposterMode 
   } = useGameStore();
 
   const [isGatekeeperPassingState, setIsGatekeeperPassingState] = useState(false);
   const [isPeeking, setIsPeeking] = useState(false);
   const [carouselIndex, setCarouselIndex] = useState(0);
+  
+  // Animation Nodes
   const pulseAnim = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    if (!fetchedImages || fetchedImages.isFallback || fetchedImages.length <= 1) return;
-    const interval = setInterval(() => {
-      setCarouselIndex((prev) => (prev + 1) % fetchedImages.length);
-    }, 3000);
-    return () => clearInterval(interval);
-  }, [fetchedImages]);
+  const fadeAnim = useRef(new Animated.Value(1)).current; // For image fading
 
   const totalPlayers = players.length;
   const startIndex = players.findIndex(p => p.id === startingPlayerId);
@@ -36,6 +31,7 @@ export default function RevealScreen() {
   const nextActualIndex = (startIndex + activeRevealIndex + 1) % totalPlayers;
   const nextPlayer = players[nextActualIndex];
 
+  // Secure Handoff Pulse Animation Loop
   useEffect(() => {
     if (isGatekeeperPassingState) {
       Animated.loop(
@@ -46,6 +42,42 @@ export default function RevealScreen() {
       ).start();
     }
   }, [isGatekeeperPassingState]);
+
+  // 3-Second Auto-Carousel Switcher with Fade Transitions
+  useEffect(() => {
+    // Isolate the current player's image array cluster
+    const images = activePlayer?.playerImages;
+    
+    // Guard: Only run if we have a valid array with multiple images
+    if (!images || !Array.isArray(images) || images.length <= 1) return;
+
+    const interval = setInterval(() => {
+      // 1. Fade Out current image
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 400,
+        useNativeDriver: true,
+      }).start(() => {
+        // 2. Change the index step after fading completely out
+        setCarouselIndex((prev) => (prev + 1) % images.length);
+        
+        // 3. Fade In the next image
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: true,
+        }).start();
+      });
+    }, 3000); // 3-second cycle interval
+
+    return () => clearInterval(interval);
+  }, [activePlayer, carouselIndex]);
+
+  // Reset carousel index whenever we switch to a new player
+  useEffect(() => {
+    setCarouselIndex(0);
+    fadeAnim.setValue(1);
+  }, [activeRevealIndex]);
 
   if (isGatekeeperPassingState) {
     return (
@@ -80,6 +112,8 @@ export default function RevealScreen() {
     }
   };
 
+  const shouldShowImposterLayout = activePlayer?.role === 'IMPOSTER' && imposterMode === 'BLIND';
+
   return (
     <View style={styles.container}>
       {/* HUD Profile Display */}
@@ -98,30 +132,27 @@ export default function RevealScreen() {
           </View>
         ) : (
           <View style={styles.revealedBox}>
-            {activePlayer?.isImposter ? (
+            {shouldShowImposterLayout ? (
               <View style={styles.cardInternal}>
                 <FimpoText style={styles.roleTitle}>YOUR SECRET ROLE:</FimpoText>
                 <Image source={require('../../assets/fox-logo.png')} style={styles.contentImageFox} resizeMode="contain" />
                 <FimpoText style={styles.roleBadge}>IMPOSTER</FimpoText>
-                <FimpoText style={styles.wordTarget}>
-                  {activePlayer.word === 'Cunning Fox' ? "Blend in! You have no word." : `Word: ${activePlayer?.word}`}
-                </FimpoText>
+                <FimpoText style={styles.wordTarget}>Blend in! You have no word.</FimpoText>
               </View>
             ) : (
               <View style={styles.cardInternal}>
                 <FimpoText style={styles.roleTitle}>YOUR SECRET ROLE:</FimpoText>
 
-                {fetchedImages?.isFallback ? (
-                  <View style={styles.emojiContainer}>
-                    <FimpoText style={styles.fallbackCategory}>Theme: {fetchedImages.categoryName}</FimpoText>
-                  </View>
-                ) : (
-                  <Image 
-                    source={{ uri: fetchedImages[carouselIndex] }} 
-                    style={styles.contentImageCivilian} 
-                    resizeMode="cover" 
-                  />
-                )}
+                {/* Animated Image View Wrapper */}
+                <View style={styles.carouselFrameAnchor}>
+                  {activePlayer?.playerImages && Array.isArray(activePlayer.playerImages) && (
+                    <Animated.Image 
+                      source={{ uri: activePlayer?.playerImages?.[carouselIndex] }} 
+                      style={[styles.contentImageCivilian, { opacity: fadeAnim }]} 
+                      resizeMode="cover" 
+                    />
+                  )}
+                </View>
 
                 <FimpoText style={styles.roleBadgeCivilian}>CIVILIAN</FimpoText>
                 <FimpoText style={styles.wordTarget}>Word: {activePlayer?.word}</FimpoText>
@@ -171,29 +202,28 @@ const styles = StyleSheet.create({
   confirmPassBtn: { backgroundColor: '#FF6B6B', width: '100%', paddingVertical: 18, borderRadius: 16, alignItems: 'center', shadowColor: '#FF6B6B', shadowRadius: 10, shadowOpacity: 0.3, elevation: 5 },
   confirmPassBtnText: { fontSize: 16, letterSpacing: 2 },
   topBanner: { alignItems: 'center' },
-  passHeader: { fontSize: 24, color: '#666', letterSpacing: 2 },
+  passHeader: { fontSize: 14, color: '#666', letterSpacing: 2 },
   playerName: { fontSize: 32, color: '#FF6B6B', marginVertical: 4, textTransform: 'uppercase', letterSpacing: 1 },
   avatarRef: { width: 75, height: 75, backgroundColor: '#1A1A1A', borderRadius: 37.5, marginTop: 4 },
   cardCenter: { flex: 1, marginVertical: 20, justifyContent: 'center' },
   hiddenBox: { backgroundColor: '#161616', borderRadius: 24, padding: 30, alignItems: 'center', height: 340, justifyContent: 'center', borderStyle: 'dashed', borderWidth: 2, borderColor: '#333' },
-  hiddenPrompt: { fontSize: 24, color: '#FF6B6B', letterSpacing: 1 },
-  hiddenSub: { fontSize: 16, color: '#555', marginTop: 8 },
+  hiddenPrompt: { fontSize: 20, color: '#FF6B6B', letterSpacing: 1 },
+  hiddenSub: { fontSize: 14, color: '#555', marginTop: 8 },
   revealedBox: { backgroundColor: '#1A1A1A', borderRadius: 24, padding: 24, alignItems: 'center', height: 340, justifyContent: 'center', borderWidth: 1, borderColor: '#FF6B6B' },
   cardInternal: { alignItems: 'center', width: '100%', height: '100%', justifyContent: 'space-between' },
-  roleTitle: { fontSize: 16, color: '#666', letterSpacing: 2 },
-  roleBadge: { backgroundColor: 'rgba(255, 107, 107, 0.15)', color: '#FF6B6B', paddingHorizontal: 14, paddingVertical: 4, borderRadius: 20, fontSize: 20, letterSpacing: 1, overflow: 'hidden' },
-  roleBadgeCivilian: { backgroundColor: 'rgba(74, 105, 189, 0.2)', color: '#4A69BD', paddingHorizontal: 14, paddingVertical: 4, borderRadius: 20, fontSize: 20, letterSpacing: 1, overflow: 'hidden' },
+  roleTitle: { fontSize: 14, color: '#666', letterSpacing: 2 },
+  roleBadge: { backgroundColor: 'rgba(255, 107, 107, 0.15)', color: '#FF6B6B', paddingHorizontal: 14, paddingVertical: 4, borderRadius: 20, fontSize: 14, letterSpacing: 1, overflow: 'hidden' },
+  roleBadgeCivilian: { backgroundColor: 'rgba(74, 105, 189, 0.2)', color: '#4A69BD', paddingHorizontal: 14, paddingVertical: 4, borderRadius: 20, fontSize: 14, letterSpacing: 1, overflow: 'hidden' },
   contentImageFox: { width: 150, height: 150 },
-  contentImageCivilian: { width: width * 0.55, height: 140, borderRadius: 16 },
+  carouselFrameAnchor: { width: width * 0.55, height: 140, borderRadius: 16, overflow: 'hidden', backgroundColor: '#121212' },
+  contentImageCivilian: { width: '100%', height: '100%' },
   wordTarget: { fontSize: 28, color: '#FFF', letterSpacing: 1 },
-  emojiContainer: { alignItems: 'center' },
-  fallbackCategory: { fontSize: 13, color: '#666', marginTop: 4 },
   footer: { width: '100%' },
   peekButton: { backgroundColor: '#262626', borderWidth: 2, borderColor: '#FF6B6B', width: '100%', paddingVertical: 18, borderRadius: 16, alignItems: 'center', marginBottom: 16 },
   peekActive: { backgroundColor: '#FF6B6B', borderColor: '#FF6B6B' },
-  peekText: { fontSize: 20, letterSpacing: 1 },
+  peekText: { fontSize: 16, letterSpacing: 1 },
   nextButtonContainer: { backgroundColor: '#1A1A1A', borderWidth: 1, borderColor: '#333', width: '100%', paddingVertical: 14, paddingLeft: 24, paddingRight: 12, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  nextContainerText: { fontSize: 20, color: '#A0A0A0', letterSpacing: 2 },
+  nextContainerText: { fontSize: 16, color: '#A0A0A0', letterSpacing: 2 },
   arrowCircleAnchor: { backgroundColor: '#FF6B6B', width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
-  arrowIconSymbol: { color: '#FFF', fontSize: 20, lineHeight: 18 },
+  arrowIconSymbol: { color: '#FFF', fontSize: 16, lineHeight: 18 },
 });

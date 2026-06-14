@@ -27,7 +27,7 @@ const useGameStore = create((set, get) => ({
   category: '',
   startingPlayerId: null,
   activeRevealIndex: 0, 
-  activeVoteIndex: 0,   
+  activeVoteIndex: 0,    
   fetchedImages: [],    
 
   // ==========================================
@@ -80,17 +80,26 @@ const useGameStore = create((set, get) => ({
 
     const imposterIndex = Math.floor(Math.random() * players.length);
     const starterIndex = Math.floor(Math.random() * players.length);
-    const images = await fetchWordImages(chosenCivilianWord, chosenCategory);
+
+    // FIXED: Fetch BOTH image profiles concurrently in parallel paths
+    const [civilianImages, infiltratorImages] = await Promise.all([
+      fetchWordImages(chosenCivilianWord, chosenCategory),
+      fetchWordImages(chosenInfiltratorWord, chosenCategory)
+    ]);
 
     const readyPlayers = players.map((player, idx) => {
       const isImposter = idx === imposterIndex;
       return {
         ...player,
         isImposter,
-        role: isImposter ? 'IMPOSTER' : 'CIVILIAN',
+        role: isImposter 
+          ? (imposterMode === 'BLIND' ? 'IMPOSTER' : 'CIVILIAN') 
+          : 'CIVILIAN',
         word: isImposter 
           ? (imposterMode === 'BLIND' ? 'Cunning Fox' : chosenInfiltratorWord) 
           : chosenCivilianWord,
+        // FIXED: Attach the correct individual image arrays directly to the player
+        playerImages: isImposter ? infiltratorImages : civilianImages,
         votesReceived: 0
       };
     });
@@ -101,7 +110,6 @@ const useGameStore = create((set, get) => ({
       secretWord: chosenCivilianWord,
       imposterWord: imposterMode === 'BLIND' ? 'Cunning Fox' : chosenInfiltratorWord,
       startingPlayerId: players[starterIndex].id,
-      fetchedImages: images,
       activeRevealIndex: 0,
       currentPhase: GAME_PHASES.WHEEL_OF_FATE
     });
@@ -122,7 +130,6 @@ const useGameStore = create((set, get) => ({
     players: state.players.map(p => ({ ...p, votesReceived: 0 }))
   })),
 
-  // FIXED: Runs voting math directly on the array to avoid async updates jamming the next round!
   castSecretVote: (suspectId) => {
     const { players, activeVoteIndex, resolveVotingResults } = get();
     const totalPlayers = players.length;
@@ -132,9 +139,7 @@ const useGameStore = create((set, get) => ({
     );
 
     if (activeVoteIndex + 1 >= totalPlayers) {
-      // First update the finalized voting tallies in your local state
       set({ players: updatedPlayers });
-      // Call the decision logic rule engine directly using our updated array matrix data
       resolveVotingResults(updatedPlayers);
     } else {
       set({ players: updatedPlayers, activeVoteIndex: activeVoteIndex + 1 });
@@ -161,7 +166,6 @@ const useGameStore = create((set, get) => ({
     set({ players: updatedPlayers });
   },
 
-  // FIXED: Accepts the passing final array cleanly to calculate phase changes instantly
   resolveVotingResults: (finalPlayersList) => {
     const activePlayers = finalPlayersList || get().players;
     
@@ -176,15 +180,11 @@ const useGameStore = create((set, get) => ({
     const victim = highestVotedPlayers[0];
     
     if (victim?.isImposter) {
-      // Imposter caught! Route straight to secure Civilian jury panel
       set({ players: activePlayers, currentPhase: GAME_PHASES.REDEMPTION });
       return { status: 'REDEMPTION', victim };
     } else {
-      // Civilian eliminated! Imposter scores points, head to public results review
       const updatedPlayers = activePlayers.map(player => {
-        if (player.isImposter) {
-          return { ...player, score: player.score + 1 };
-        }
+        if (player.isImposter) return { ...player, score: player.score + 1 };
         return player;
       });
       set({ players: updatedPlayers, currentPhase: GAME_PHASES.RESOLUTION });

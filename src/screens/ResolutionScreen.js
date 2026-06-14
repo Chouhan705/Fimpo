@@ -4,16 +4,27 @@ import useGameStore, { GAME_PHASES } from '../store/useGameStore';
 import FimpoText from '../components/FimpoText';
 
 export default function ResolutionScreen() {
-  const { players, getVotingVerdict, applyCivilianEliminationPoints, setPhase, returnToLobbyHub } = useGameStore();
+  const { 
+    players, 
+    getVotingVerdict, 
+    applyCivilianEliminationPoints, 
+    setPhase, 
+    returnToLobbyHub,
+    secretWord,
+    imposterWord,
+    imposterMode
+  } = useGameStore();
 
   const verdict = getVotingVerdict();
 
-  // If a Civilian was eliminated, apply the Imposter's bonus points immediately on mount
   useEffect(() => {
     if (verdict.status === 'DECIDED' && !verdict.victim?.isImposter) {
       applyCivilianEliminationPoints();
     }
   }, []);
+
+  // Locate the actual hidden imposter player to cleanly flag them in the final results list
+  const actualImposter = players.find(p => p.isImposter);
 
   return (
     <View style={styles.container}>
@@ -38,7 +49,7 @@ export default function ResolutionScreen() {
             
             {verdict.victim?.isImposter ? (
               <View style={styles.winBadgeCivilian}>
-                <FimpoText style={styles.winBadgeText}>🎯 TARGET IS THE IMPOSTER!</FimpoText>
+                <FimpoText style={styles.winBadgeText}>🎯 TARGET WAS THE IMPOSTER!</FimpoText>
               </View>
             ) : (
               <View style={styles.winBadgeImposter}>
@@ -48,6 +59,23 @@ export default function ResolutionScreen() {
           </View>
         )}
       </View>
+
+      {/* NEW: INFILTRATOR MODE WORDS EXPOSED SIDE-BY-SIDE */}
+      {imposterMode === 'INFILTRATOR' && verdict.status !== 'TIE' && (
+        <View style={styles.wordRevealBannerCard}>
+          <FimpoText style={styles.wordRevealHeader}>📋 WORD CLUE COMPARISON</FimpoText>
+          <View style={styles.wordRevealFlexRow}>
+            <View style={styles.wordRevealBlock}>
+              <FimpoText style={styles.wordRevealLabel}>CIVILIANS HAD:</FimpoText>
+              <FimpoText style={styles.wordRevealValueText}>{secretWord}</FimpoText>
+            </View>
+            <View style={[styles.wordRevealBlock, { borderLeftWidth: 1, borderLeftColor: '#333' }]}>
+              <FimpoText style={[styles.wordRevealLabel, { color: '#FF6B6B' }]}>IMPOSTER HAD:</FimpoText>
+              <FimpoText style={[styles.wordRevealValueText, { color: '#FF6B6B' }]}>{imposterWord}</FimpoText>
+            </View>
+          </View>
+        </View>
+      )}
 
       {/* Scrollable breakdown list showing exact vote counts cast per player */}
       <View style={styles.breakdownWrapper}>
@@ -96,7 +124,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 32, color: '#FF6B6B', letterSpacing: 2, textTransform: 'uppercase' },
   subtitle: { fontSize: 13, color: '#666', marginTop: 4 },
   
-  centerRevealCard: { backgroundColor: '#1A1A1A', borderRadius: 24, padding: 24, alignItems: 'center', marginVertical: 15, borderWidth: 1, borderColor: '#262626' },
+  centerRevealCard: { backgroundColor: '#1A1A1A', borderRadius: 24, padding: 24, alignItems: 'center', marginVertical: 10, borderWidth: 1, borderColor: '#262626' },
   outcomeGroup: { alignItems: 'center', width: '100%' },
   outcomeTitle: { fontSize: 24, color: '#E74C3C', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 },
   outcomeDesc: { fontSize: 13, color: '#A0A0A0', textAlign: 'center', lineHeight: 20 },
@@ -108,7 +136,15 @@ const styles = StyleSheet.create({
   winBadgeImposter: { backgroundColor: 'rgba(231, 76, 60, 0.15)', borderWidth: 1, borderColor: '#E74C3C', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12 },
   winBadgeText: { color: '#FFF', fontSize: 13, fontWeight: 'bold', letterSpacing: 0.5 },
 
-  breakdownWrapper: { flex: 1, marginBottom: 20 },
+  // --- Dynamic Word Comparison View Layout CSS ---
+  wordRevealBannerCard: { backgroundColor: '#161616', borderRadius: 16, padding: 14, marginBottom: 15, borderWidth: 1, borderColor: '#262626' },
+  wordRevealHeader: { fontSize: 11, color: '#666', letterSpacing: 1, textAlign: 'center', marginBottom: 10 },
+  wordRevealFlexRow: { flexDirection: 'row', width: '100%' },
+  wordRevealBlock: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  wordRevealLabel: { fontSize: 10, color: '#4A69BD', fontWeight: 'bold', marginBottom: 2 },
+  wordRevealValueText: { fontSize: 20, color: '#FFF', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 1 },
+
+  breakdownWrapper: { flex: 1, marginBottom: 15 },
   breakdownHeaderTitle: { fontSize: 12, color: '#444', letterSpacing: 1, marginBottom: 8 },
   breakdownScroll: { backgroundColor: '#161616', borderRadius: 16, padding: 10, borderWidth: 1, borderColor: '#222' },
   voteRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 10, borderBottomWidth: 1, borderBottomColor: '#222' },
