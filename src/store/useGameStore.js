@@ -11,8 +11,11 @@ export const GAME_PHASES = {
   VERBAL_ROUND: 'VERBAL_ROUND',
   VOTING: 'VOTING',
   SHOWDOWN: 'SHOWDOWN',
+  VERDICT_GATEWAY: 'VERDICT_GATEWAY',
+  OUTCOME_REVEAL: 'OUTCOME_REVEAL',
+  TIE_REVEAL: 'TIE_REVEAL',
   REDEMPTION: 'REDEMPTION',
-  RESOLUTION: 'RESOLUTION'
+  ROUND_SCOREBOARD: 'ROUND_SCOREBOARD'
 };
 
 const useGameStore = create((set, get) => ({
@@ -146,7 +149,7 @@ const useGameStore = create((set, get) => ({
   })),
 
   castSecretVote: (suspectId) => {
-    const { players, activeVoteIndex, resolveVotingResults } = get();
+    const { players, activeVoteIndex } = get();
     const totalPlayers = players.length;
     
     const updatedPlayers = players.map(p => 
@@ -154,8 +157,8 @@ const useGameStore = create((set, get) => ({
     );
 
     if (activeVoteIndex + 1 >= totalPlayers) {
-      set({ players: updatedPlayers });
-      resolveVotingResults(updatedPlayers);
+      // Lock the voting array data and go straight to the Gateway view
+      set({ players: updatedPlayers, currentPhase: GAME_PHASES.VERDICT_GATEWAY });
     } else {
       set({ players: updatedPlayers, activeVoteIndex: activeVoteIndex + 1 });
     }
@@ -187,8 +190,9 @@ const useGameStore = create((set, get) => ({
     const maxVotes = Math.max(...activePlayers.map(p => p.votesReceived));
     const highestVotedPlayers = activePlayers.filter(p => p.votesReceived === maxVotes);
 
+    // FIXED: Route to the newly built dedicated Tie Reveal file screen layout
     if (highestVotedPlayers.length > 1 && maxVotes > 0) {
-      set({ players: activePlayers, currentPhase: GAME_PHASES.SHOWDOWN });
+      set({ players: activePlayers, currentPhase: GAME_PHASES.TIE_REVEAL });
       return { status: 'TIE', defendants: highestVotedPlayers };
     }
 

@@ -1,38 +1,31 @@
 {
   "expo": {
-    "name": "app",
-    "slug": "app",
+    "name": "Fimpo",
+    "slug": "fimpo-game",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
-    "newArchEnabled": true,
+    "icon": "./assets/fox-logo.png",
+    "userInterfaceStyle": "dark",
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/fox-logo.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#121212"
     },
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/fox-logo.png",
+        "backgroundColor": "#121212"
       },
-      "edgeToEdgeEnabled": true,
-      "package": "com.chouhan705.app"
+      "package": "com.aditya.fimpo"
     },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    },
-    "plugins": [
-      "expo-font"
-    ],
     "extra": {
       "eas": {
-        "projectId": "889eec64-35e2-43d7-8347-006c0a1f2b04"
+        "projectId": "bb18d517-2423-410d-8a52-964c820b73e2"
       }
-    }
+    },
+    "owner": "chouhan705"
   }
 }

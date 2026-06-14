@@ -11,9 +11,11 @@ import RevealScreen from './src/screens/RevealScreen.js';
 import WheelScreen from './src/screens/WheelScreen';
 import VerbalRoundScreen from './src/screens/VerbalRoundScreen';
 import VotingScreen from './src/screens/VotingScreen';
-import ResolutionScreen from './src/screens/ResolutionScreen';
+import VerdictGatewayScreen from './src/screens/VerdictGatewayScreen';
+import OutcomeRevealScreen from './src/screens/OutcomeRevealScreen';
 import RedemptionScreen from './src/screens/RedemptionScreen';
-import ShowdownScreen from './src/screens/ShowdownScreen';
+import RoundScoreboardScreen from './src/screens/RoundScoreboardScreen';
+import TieRevealScreen from './src/screens/TieRevealScreen';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -73,9 +75,11 @@ export default function App() {
       {currentPhase === GAME_PHASES.ROLE_REVEAL && <RevealScreen />}
       {currentPhase === GAME_PHASES.VERBAL_ROUND && <VerbalRoundScreen />}
       {currentPhase === GAME_PHASES.VOTING && <VotingScreen />}
-      {currentPhase === GAME_PHASES.SHOWDOWN && <ShowdownScreen />}
+      {currentPhase === GAME_PHASES.TIE_REVEAL && <TieRevealScreen />}
+      {currentPhase === GAME_PHASES.VERDICT_GATEWAY && <VerdictGatewayScreen />}
+      {currentPhase === GAME_PHASES.OUTCOME_REVEAL && <OutcomeRevealScreen />}
       {currentPhase === GAME_PHASES.REDEMPTION && <RedemptionScreen />}
-      {currentPhase === GAME_PHASES.RESOLUTION && <ResolutionScreen />}
+      {currentPhase === GAME_PHASES.ROUND_SCOREBOARD && <RoundScoreboardScreen />}
     </SafeAreaView>
   );
 }
