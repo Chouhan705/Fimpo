@@ -139,7 +139,7 @@ const styles = StyleSheet.create({
 
   footerContainer: { width: '100%', height: 140, justifyContent: 'center' },
   actionLaunchBtn: { backgroundColor: '#FF6B6B', paddingVertical: 16, borderRadius: 16, alignItems: 'center', shadowColor: '#FF6B6B', shadowRadius: 10, shadowOpacity: 0.3, elevation: 5 },
-  actionLaunchText: { fontSize: 16, letterSpacing: 1 },
+  actionLaunchText: { fontSize: 20, letterSpacing: 1 },
 
   winnerCard: {
     position: 'absolute',

@@ -64,41 +64,56 @@ const useGameStore = create((set, get) => ({
   initializeMatch: async () => {
     const { players, imposterMode } = get();
     
+    // 1. Pick a random category array from our extended dictionary dataset
     const categories = Object.keys(EXTENDED_WORD_BANK);
     const chosenCategory = categories[Math.floor(Math.random() * categories.length)];
     const activeWordList = EXTENDED_WORD_BANK[chosenCategory];
 
+    // 2. Core Selection Matrix
     const civilianWordIndex = Math.floor(Math.random() * activeWordList.length);
-    let infiltratorWordIndex = Math.floor(Math.random() * activeWordList.length);
+    const chosenCivilianWord = activeWordList[civilianWordIndex];
     
-    while (infiltratorWordIndex === civilianWordIndex) {
-      infiltratorWordIndex = Math.floor(Math.random() * activeWordList.length);
+    let chosenInfiltratorWord = 'Cunning Fox';
+    let civilianImages = [];
+    let infiltratorImages = [];
+
+    // --- MODE MATRIX BRANCHING ---
+    if (imposterMode === 'INFILTRATOR') {
+      // INFILTRATOR MODE: Pull two distinct words and two image profiles in parallel
+      let infiltratorWordIndex = Math.floor(Math.random() * activeWordList.length);
+      while (infiltratorWordIndex === civilianWordIndex) {
+        infiltratorWordIndex = Math.floor(Math.random() * activeWordList.length);
+      }
+      chosenInfiltratorWord = activeWordList[infiltratorWordIndex];
+
+      // Fetch images for BOTH words concurrently
+      const [civImgs, infImgs] = await Promise.all([
+        fetchWordImages(chosenCivilianWord, chosenCategory),
+        fetchWordImages(chosenInfiltratorWord, chosenCategory)
+      ]);
+      civilianImages = civImgs;
+      infiltratorImages = infImgs;
+    } else {
+      // BLIND IMPOSTER MODE: Only fetch images for the single Civilian word
+      civilianImages = await fetchWordImages(chosenCivilianWord, chosenCategory);
+      infiltratorImages = []; // No image arrays needed for Blind Imposter
     }
 
-    const chosenCivilianWord = activeWordList[civilianWordIndex];
-    const chosenInfiltratorWord = activeWordList[infiltratorWordIndex];
-
+    // 3. Select random picker parameters for game assignments
     const imposterIndex = Math.floor(Math.random() * players.length);
     const starterIndex = Math.floor(Math.random() * players.length);
 
-    // FIXED: Fetch BOTH image profiles concurrently in parallel paths
-    const [civilianImages, infiltratorImages] = await Promise.all([
-      fetchWordImages(chosenCivilianWord, chosenCategory),
-      fetchWordImages(chosenInfiltratorWord, chosenCategory)
-    ]);
-
+    // 4. Map allocations cleanly to each specific player object
     const readyPlayers = players.map((player, idx) => {
       const isImposter = idx === imposterIndex;
       return {
         ...player,
         isImposter,
+        // If Infiltrator mode, hide identity by setting role to 'CIVILIAN'
         role: isImposter 
           ? (imposterMode === 'BLIND' ? 'IMPOSTER' : 'CIVILIAN') 
           : 'CIVILIAN',
-        word: isImposter 
-          ? (imposterMode === 'BLIND' ? 'Cunning Fox' : chosenInfiltratorWord) 
-          : chosenCivilianWord,
-        // FIXED: Attach the correct individual image arrays directly to the player
+        word: isImposter ? chosenInfiltratorWord : chosenCivilianWord,
         playerImages: isImposter ? infiltratorImages : civilianImages,
         votesReceived: 0
       };
@@ -108,7 +123,7 @@ const useGameStore = create((set, get) => ({
       players: readyPlayers,
       category: chosenCategory,
       secretWord: chosenCivilianWord,
-      imposterWord: imposterMode === 'BLIND' ? 'Cunning Fox' : chosenInfiltratorWord,
+      imposterWord: chosenInfiltratorWord,
       startingPlayerId: players[starterIndex].id,
       activeRevealIndex: 0,
       currentPhase: GAME_PHASES.WHEEL_OF_FATE
