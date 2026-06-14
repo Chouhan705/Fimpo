@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, View, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Image, Dimensions } from 'react-native';
+import { StyleSheet, View, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Image, Dimensions, Alert} from 'react-native';
 import useGameStore, { GAME_PHASES } from '../store/useGameStore';
 import FimpoText from '../components/FimpoText';
 
@@ -38,9 +38,9 @@ export default function SetupScreen() {
         </View>
         {/* Mode Selection Toggles */}
           <TouchableOpacity style={styles.counterCard} onPress={toggleImposterMode}>
-            <FimpoText style={styles.counterLabel}>Tactical Game Mode</FimpoText>
-            <FimpoText style={{ fontSize: 18, color: '#FF6B6B' }}>
-              {imposterMode === 'BLIND' ? "🦊 Blind Imposter (Hard)" : "🕵️‍♂️ Infiltrator (Tactical)"}
+            <FimpoText style={styles.counterLabel}>Game Mode{"\n"}[Tap to change]</FimpoText>
+            <FimpoText style={{ fontSize: 18, color: '#FF6B6B',textAlign: 'center' }}>
+              {imposterMode === 'BLIND' ? "🦊\nBlind Imposter (Imposter gets no word)" : "🕵️\nInfiltrator (Imposter gets a word)"}
             </FimpoText>
           </TouchableOpacity>
 
@@ -72,17 +72,33 @@ export default function SetupScreen() {
 
         {/* Proceed Button */}
         <TouchableOpacity 
-          style={styles.launchButton}
+          style={[styles.launchButton, players.length < 3 && { opacity: 0.4 }]}
           activeOpacity={0.8}
+          disabled={players.length < 3}
           onPress={() => {
-            // Basic verification guard to make sure nobody left names totally blank
+            const hasBlankNames = players.some(p => !p.name.trim()); 
+            const proceed = () => {
             const preparedPlayers = players.map(p => ({
-              ...p,
-              name: p.name.trim() || `Player ${p.id}`
-            }));
-          setInitialPlayersList(preparedPlayers); // Locks players into their session slots
-          }}
-          >
+            ...p,
+            name: p.name.trim() || `Player ${p.id}`
+          }));
+          setInitialPlayersList(preparedPlayers);
+        };
+
+        if (hasBlankNames) {
+          Alert.alert(
+            "Names not entered",
+            "Some players have no name. Continue with default names?",
+            [
+              { text: "Go Back", style: "cancel" },
+              { text: "Continue", onPress: proceed }
+            ]
+          );
+        } else {
+        proceed();
+        }
+      }}
+      >
       <FimpoText style={styles.launchButtonText}>CREATE GAME SESSION ➔</FimpoText>
       </TouchableOpacity>
 
@@ -132,6 +148,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     textTransform: 'uppercase',
     marginBottom: 10,
+    textAlign: 'center',
   },
   counterRow: {
     flexDirection: 'row',

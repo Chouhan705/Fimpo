@@ -53,7 +53,7 @@ const useGameStore = create((set, get) => ({
   addPlayer: () => set((state) => {
     const nextId = (state.players.length + 1).toString();
     const defaultName = `Player ${nextId}`;
-    return { players: [...state.players, { id: nextId, name: defaultName, avatar: `https://robohash.org/${defaultName}?set=set2` }] };
+    return { players: [...state.players, { id: nextId, name: "", avatar: `https://robohash.org/${defaultName}?set=set2` }] };
   }),
 
   removePlayer: () => set((state) => {
