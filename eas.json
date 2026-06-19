@@ -11,6 +11,10 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_UNSPLASH_API_KEY": "PASTE_YOUR_ACTUAL_UNSPLASH_KEY_STRING_HERE",
+        "EXPO_PUBLIC_PEXELS_API_KEY": "PASTE_YOUR_ACTUAL_PEXELS_KEY_STRING_HERE"
       }
     },
     "production": {}

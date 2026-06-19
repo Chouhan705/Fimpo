@@ -1,4 +1,7 @@
-import { API_KEYS } from './apiCredentials';
+const API_KEYS = {
+  PEXELS: process.env.EXPO_PUBLIC_PEXELS_API_KEY || "",
+  UNSPLASH: process.env.EXPO_PUBLIC_UNSPLASH_API_KEY || ""
+};
 
 // Category Emoji configurations for emergency offline fallbacks
 const CATEGORY_EMOJIS = {
