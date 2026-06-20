@@ -4,10 +4,10 @@
     "slug": "fimpo-game",
     "version": "1.3.4",
     "orientation": "portrait",
-    "icon": "./assets/app-logo.png",
+    "icon": "./assets/fimpo-logo.png",
     "userInterfaceStyle": "dark",
     "splash": {
-      "image": "./assets/app-logo.png",
+      "image": "./assets/fimpo-logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#121212"
     },
@@ -16,7 +16,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/app-logo.png",
+        "foregroundImage": "./assets/fimpo-logo.png",
         "backgroundColor": "#121212"
       },
       "package": "com.aditya.fimpo"
